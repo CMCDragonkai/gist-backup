@@ -7,9 +7,9 @@
 #
 # Example:
 #
-#   gist-backup -d ~/gist-backups -t token
-#   gist-backup -ab archive.tar.bzip2 -t token
-#   gist-backup -ag archive.tar.gzip -t token
+#   gist-backup -d ~/gist-backups [-t token]
+#   gist-backup -ab archive.tar.bzip2 [-t token]
+#   gist-backup -ag archive.tar.gzip [-t token]
 
 set -o errexit
 set -o pipefail
