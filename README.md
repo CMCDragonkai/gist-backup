@@ -30,8 +30,8 @@ You can revoke this token at any time by visiting <https://github.com/settings/a
 
 When you have set the gist token as described above, you can start backing up all your gists using the following commands:
 
-    $ gist-backup -d ~/gist-backups -t token
-    $ gist-backup -ab archive.tar.bzip2 -t token
-    $ gist-backup -ag archive.tar.gzip -t token
+    $ gist-backup -d ~/gist-backups [-t token]
+    $ gist-backup -ab archive.tar.bzip2 [-t token]
+    $ gist-backup -ag archive.tar.gzip [-t token]
 
 For the `-d` option, when you call the script again, it will simply update the repos (pull changes) if they exist already.
