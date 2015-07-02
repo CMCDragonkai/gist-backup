@@ -4,6 +4,7 @@ This Bash script backs up your public and private gists to a given directory as 
 If the directories already exist, the gist repos will be updated.
 It's all implemented as a simple Bash script.
 It probably breaks if you have a lot of gists. Also, watch out for rate limiting.
+This version was forked and archiving + compression feature was added.
 
 #### Setup
 
@@ -27,14 +28,10 @@ You can revoke this token at any time by visiting <https://github.com/settings/a
 
 #### Usage
 
-When you have set the gist token as described above, you can start backing up all your gists using the following command:
+When you have set the gist token as described above, you can start backing up all your gists using the following commands:
 
-    $ ./gist-backup ~/gist-backups
+    $ gist-backup -d ~/gist-backups -t token
+    $ gist-backup -ab archive.tar.bzip2 -t token
+    $ gist-backup -ag archive.tar.gzip -t token
 
-This will clone all gist repositories to the local folder `~/gist-backups`.
-
-When you call the script again, it will simply update the repos (pull changes) if they exist already.
-
-#### Copyright & License
-
-Copyright (C) 2012, Adam Prescott, licensed under the MIT license. See LICENSE.
+For the `-d` option, when you call the script again, it will simply update the repos (pull changes) if they exist already.
