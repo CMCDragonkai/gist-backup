@@ -7,82 +7,138 @@
 #
 # Example:
 #
-#   gist-backup ~/gist-backups
-#
+#   gist-backup -d ~/gist-backups -t token
+#   gist-backup -ab archive.tar.bzip2 -t token
+#   gist-backup -ag archive.tar.gzip -t token
 
-token=$(git config --get github.gist.oauth.token)
+set -o errexit
+set -o pipefail
 
+# process the command line parameters
+while [[ $# > 0 ]]; do
+  key="$1"
+  case $key in
+      -t|--token)
+      # if no command line token, we default it to our github options
+      token="$2" 
+      shift
+      ;;
+      -d|--directory)
+      directory="$2"
+      shift # past argument
+      ;;
+      -ab|--archive-bzip2)
+      archive_type="bzip2"
+      archive_name="$2"
+      shift # past argument
+      ;;
+      -ag|--archive-gzip)
+      archive_type="gzip"
+      archive_name="$2"
+      shift # past argument
+      ;;
+  esac
+  shift # past argument or value
+done
+
+# default token value
+token="${token:-$(git config --get github.gist.oauth.token)}"
+
+#  usage explanation
 usage() {
+
 cat <<END_USAGE
 
 Usage:
 
-  gist-backup DIRECTORY
-
-Example:
-
-  gist-backup ~/gist-backups
+  gist-backup -d ~/gist-backups [-t token]
+  gist-backup -ab ~/archive.tar.bzip2 [-t token]
+  gist-backup -ag ~/archive.tar.gzip [-t token]
 
 END_USAGE
 
-if [ -z $token ]
-then
+if [ -z $token ]; then
 
 cat <<END_USAGE_NOTE
 NOTE:
 
   In order for this to work, you're going to need
-  an OAuth token set in your git config under
-  
-    github.gist.oauth.token
-  
+  an OAuth token from Github.
+    
   This is because the API token for your account
   cannot be used as authentication/authorization
   in version 3 of GitHub's API.
 
+  You can do this by running:
+
+  $ curl -u github-user-name:github-password \\
+    -H "Content-Type: application/json" \\
+    -X POST \\
+    -d '{"scopes":["gist"], "note": "gist backup"}' \\
+    https://api.github.com/authorizations
+
+  Copy the token, and add it to your git options:
+
+  $ git config --global github.gist.oauth.token TOKEN
+
+  Or just pass it as an option to the script:
+
+  $ gist-backup -t TOKEN
+
 END_USAGE_NOTE
+
 fi
+
 }
 
-if [ -z $token ]
-then
-  echo "No OAuth token found in github.gist.oauth.token git config."
-  exit 1
-fi
-
-# if no backup directory has been given
-if [ -z "$1" ]
-then
-  echo "No backup directory given."
+#  if no token, we have failed
+if [ -z $token ]; then
+  echo "No Github OAuth token found."
   usage
   exit 1
 fi
 
-# if the given directory doesn't exist, create it
-if [ ! -e "$1" ]
-then
-  mkdir -p $1
-fi
-
-# go into the given backup directory
-cd $1
-
-# if we failed to cd for some reason, abort
-if [ $? -gt 0 ]
-then
+# if no directory and no archive then we have failed
+if [ -z $directory ] && [ -z $archive_name ]; then
+  echo "No commands given."
+  usage
   exit 1
 fi
 
+# setup the persistent/temporary directory
+if [ -n "$directory" ]; then
+  mkdir -p $directory
+  target="$directory"
+  temporary=false
+else
+  target=$(mktemp -d -t tmp.XXXXXXXXXX)
+  temporary=true
+fi
+
+# clean up function, we have to define it here, because we need to use the closure variables
+# think of it like a catch-try expression
+clean_up () {
+
+  # if we exited with an error, we are going to clean up the target
+  # if we didn't exit with an error, we will only clean up if the target was temporary
+  if [ "$?" -ne "0" ]; then
+    rm -rf "$target"
+  elif [ "$temporary" = true ]; then
+    rm -rf "$target"
+  fi
+
+}
+trap clean_up TERM EXIT
+
 # Take's a git remote URI and clones it into
-# the backup directory. If that directory
+# the backup target directory. If that directory
 # exists already, cd's into it and does a
 # git pull.
-backup() {
+backup () {
   echo "Backing up $1"
   local dir=$(echo "$1" | cut -d / -f 4 | cut -d . -f 1)
 
-  if [ -e $dir ]
-  then
+  if [ -e $dir ]; then
     echo "  Already cloned at $PWD/$dir. Pulling."
     cd $dir
     git pull -q
@@ -92,34 +148,48 @@ backup() {
   fi
 }
 
+# go into the target directory, and start copying!
+pushd "$target"
+
 page=1
 retries=0
 MAX_RETRIES=5
-while [ $retries -lt $MAX_RETRIES ]
-do
+while [ $retries -lt $MAX_RETRIES ]; do
+
   echo "Requesting Gist page: $page"
+  
+  gists=$(curl -s -H "Authorization: token $token" -d "page=$page" -G https://api.github.com/gists | sed -n 's/.*git_pull_url": "\(.*\)",/\1/p')
 
-  gists=$(
-  curl -s -H "Authorization: token $token" -d "page=$page" -G https://api.github.com/gists |
-  sed -n 's/.*git_pull_url": "\(.*\)",/\1/p'
-  )
-
-  if [ -z "$gists" ]
-  then
+  if [ -z "$gists" ]; then
     echo "No gists found on this page. Trying again."
     retries=$(( retries + 1 ))
     continue
   fi
 
-  for gist in $gists
-  do
+  for gist in $gists; do
     backup $gist
   done
 
   page=$(( page + 1 ))
   retries=0
+
 done
+
+# go back to where we were!
+popd
+
+if [ -n "$archive_name" ]; then
+
+  case $archive_type in
+    "bzip2")
+      tar -jcvf "$archive_name" "$target"
+    ;;
+    "gzip")
+      tar -zcvf "$archive_name" "$target"
+    ;;
+  esac
+
+fi
 
 echo "No gists found (anymore). Not trying again."
 exit 0
-
