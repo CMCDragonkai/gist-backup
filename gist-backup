@@ -111,7 +111,7 @@ if [ -n "$directory" ]; then
   target="$directory"
   temporary=false
 else
-  target=$(mktemp -d -t tmp.XXXXXXXXXX)
+  target=$(mktemp -d -t gists.XXXXXXXXXX)
   temporary=true
 fi
 
@@ -182,10 +182,10 @@ if [ -n "$archive_name" ]; then
 
   case $archive_type in
     "bzip2")
-      tar -jcvf "$archive_name" "$target"
+      tar -jcf "$archive_name" "$target"
     ;;
     "gzip")
-      tar -zcvf "$archive_name" "$target"
+      tar -zcf "$archive_name" "$target"
     ;;
   esac
 
