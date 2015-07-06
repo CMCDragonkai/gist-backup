@@ -121,14 +121,17 @@ clean_up () {
 
   # if we exited with an error, we are going to clean up the target
   # if we didn't exit with an error, we will only clean up if the target was temporary
-  if [ "$?" -ne "0" ]; then
+  if [ "$1" -ne "0" ]; then
     rm -rf "$target"
   elif [ "$temporary" = true ]; then
     rm -rf "$target"
   fi
+  
+  exit $1
 
 }
-trap clean_up TERM EXIT
+
+trap 'clean_up $?' INT TERM ERR
 
 # Take's a git remote URI and clones it into
 # the backup target directory. If that directory
@@ -192,4 +195,5 @@ if [ -n "$archive_name" ]; then
 fi
 
 echo "No gists found (anymore). Not trying again."
-exit 0
+
+clean_up 0
